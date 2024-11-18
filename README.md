@@ -56,6 +56,3 @@ For issues, suggestions, or contributions, please visit the plugin's repository 
 ---
 
 Tags: `wilderness`, `obelisk`, `protection`, `poh`
-```
-
-You can now copy this entire block and use it as your README.md file. The formatting will be preserved when you paste it into a markdown file.
