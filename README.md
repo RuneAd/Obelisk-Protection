@@ -1,4 +1,3 @@
-```markdown
 # Obelisk Protection Plugin
 
 A RuneLite plugin that helps protect players from accidentally using their POH Wilderness Obelisk when carrying valuable items, potentially preventing costly mistakes and item loss.
