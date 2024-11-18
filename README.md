@@ -1,5 +1,3 @@
-Here's the full README content that you can easily copy and paste:
-
 ```markdown
 # Obelisk Protection Plugin
 
