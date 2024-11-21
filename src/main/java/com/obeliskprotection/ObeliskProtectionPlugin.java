@@ -146,7 +146,8 @@ public class ObeliskProtectionPlugin extends Plugin
         ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
         ItemContainer equipment = client.getItemContainer(InventoryID.EQUIPMENT);
         
-        List<Integer> allValues = new ArrayList<>();
+        List<Integer> protectedValues = new ArrayList<>();
+        int totalRiskValue = 0;
         
         if (inventory != null)
         {
@@ -155,9 +156,23 @@ public class ObeliskProtectionPlugin extends Plugin
                 if (item.getId() != -1)
                 {
                     int gePrice = itemManager.getItemPrice(item.getId());
-                    allValues.add(gePrice * item.getQuantity());
+                    ItemComposition itemComp = itemManager.getItemComposition(item.getId());
+                    
+                    if (itemComp.isStackable() && item.getQuantity() > 3)
+                    {
+                        // For stackable items, treat the whole stack minus 3 as risk
+                        totalRiskValue += gePrice * (item.getQuantity() - 3);
+                        // Add single item value to protected values list
+                        protectedValues.add(gePrice);
+                    }
+                    else
+                    {
+                        // For non-stackable items, add full value to protected values list
+                        protectedValues.add(gePrice * item.getQuantity());
+                    }
+                    
                     log.debug("Inventory item: {} x{} = {}", 
-                        itemManager.getItemComposition(item.getId()).getName(),
+                        itemComp.getName(),
                         item.getQuantity(), 
                         gePrice * item.getQuantity());
                 }
@@ -171,31 +186,40 @@ public class ObeliskProtectionPlugin extends Plugin
                 if (item.getId() != -1)
                 {
                     int gePrice = itemManager.getItemPrice(item.getId());
-                    allValues.add(gePrice * item.getQuantity());
+                    ItemComposition itemComp = itemManager.getItemComposition(item.getId());
+                    
+                    if (itemComp.isStackable() && item.getQuantity() > 3)
+                    {
+                        // For stackable items, treat the whole stack minus 3 as risk
+                        totalRiskValue += gePrice * (item.getQuantity() - 3);
+                        // Add single item value to protected values list
+                        protectedValues.add(gePrice);
+                    }
+                    else
+                    {
+                        // For non-stackable items, add full value to protected values list
+                        protectedValues.add(gePrice * item.getQuantity());
+                    }
+                    
                     log.debug("Equipment item: {} x{} = {}", 
-                        itemManager.getItemComposition(item.getId()).getName(),
+                        itemComp.getName(),
                         item.getQuantity(), 
                         gePrice * item.getQuantity());
                 }
             }
         }
         
-        Collections.sort(allValues, Collections.reverseOrder());
+        // Sort protected values to find the 3 most valuable items
+        Collections.sort(protectedValues, Collections.reverseOrder());
         
-        // Log the top 3 items being excluded
-        for (int i = 0; i < Math.min(3, allValues.size()); i++)
+        // Add any remaining non-protected items to risk value
+        for (int i = 3; i < protectedValues.size(); i++)
         {
-            log.debug("Protected value #{}: {}", i + 1, allValues.get(i));
+            totalRiskValue += protectedValues.get(i);
         }
         
-        int totalValue = 0;
-        for (int i = 3; i < allValues.size(); i++)
-        {
-            totalValue += allValues.get(i);
-        }
-        
-        log.debug("Final risk value: {}, Threshold: {}", totalValue, config.wealthThreshold());
-        return totalValue;
+        log.debug("Final risk value: {}, Threshold: {}", totalRiskValue, config.wealthThreshold());
+        return totalRiskValue;
     }
 
     private GameObject findObelisk()
