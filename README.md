@@ -6,6 +6,10 @@ A RuneLite plugin that helps protect players from accidentally using their POH W
 
 ## Features
 
+
+https://github.com/user-attachments/assets/6f6ddc4b-8ae3-4016-946c-65bd4d1a57b9
+
+
 - **Wealth-Based Protection**: Automatically prevents teleport options when carrying items exceeding a configurable value threshold
   - Calculates risk value excluding your 3 most valuable items (similar to item protection mechanics)
   - Default threshold is set to 1M GP
