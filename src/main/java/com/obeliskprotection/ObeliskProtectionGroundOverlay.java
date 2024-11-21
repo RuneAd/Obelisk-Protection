@@ -12,6 +12,10 @@ import java.awt.Graphics2D;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.Point;
 import net.runelite.api.Perspective;
+import net.runelite.api.GameState;
+import net.runelite.api.GameObject;
+import net.runelite.api.Tile;
+import net.runelite.api.Scene;
 
 public class ObeliskProtectionGroundOverlay extends Overlay
 {
@@ -37,6 +41,11 @@ public class ObeliskProtectionGroundOverlay extends Overlay
             return null;
         }
 
+        if (client.getGameState() != GameState.LOGGED_IN || !isInPOH())
+        {
+            return null;
+        }
+
         LocalPoint loc = plugin.getObeliskLocation();
         if (loc != null)
         {
@@ -54,5 +63,49 @@ public class ObeliskProtectionGroundOverlay extends Overlay
         }
 
         return null;
+    }
+
+    private boolean isInPOH()
+    {
+        int plane = client.getPlane();
+        
+        LocalPoint playerLocation = client.getLocalPlayer().getLocalLocation();
+        Scene scene = client.getScene();
+        Tile[][][] tiles = scene.getTiles();
+        
+        int radius = 50;
+        int baseX = playerLocation.getSceneX() - radius;
+        int baseY = playerLocation.getSceneY() - radius;
+        
+        for (int x = 0; x < (2 * radius + 1); x++)
+        {
+            for (int y = 0; y < (2 * radius + 1); y++)
+            {
+                int checkX = baseX + x;
+                int checkY = baseY + y;
+                
+                if (checkX < 0 || checkY < 0 || checkX >= 104 || checkY >= 104)
+                {
+                    continue;
+                }
+                
+                Tile tile = tiles[plane][checkX][checkY];
+                if (tile != null)
+                {
+                    GameObject[] objects = tile.getGameObjects();
+                    if (objects != null)
+                    {
+                        for (GameObject obj : objects)
+                        {
+                            if (obj != null && obj.getId() == ObeliskProtectionPlugin.POH_OBELISK_ID)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 } 

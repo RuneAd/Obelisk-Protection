@@ -51,7 +51,7 @@ public class ObeliskProtectionPlugin extends Plugin
     private LocalPoint obeliskLocation = null;
 
     // POH Wilderness Obelisk object ID
-    private static final int POH_OBELISK_ID = 31554;
+    public static final int POH_OBELISK_ID = 31554;
 
     private static final int[] WILDERNESS_OBELISK_IDS = {
         14826, 14827, 14828, 14829, 14830, 14831  // Wilderness obelisks to ignore
@@ -83,25 +83,34 @@ public class ObeliskProtectionPlugin extends Plugin
         // Check if this is an obelisk interaction
         if (!event.getTarget().contains("Obelisk"))
         {
+            // Clear protection state when mouse leaves obelisk
+            protectionActive = false;
+            obeliskLocation = null;
             return;
         }
 
-        // Check if this is a teleport-related option
-        String option = event.getOption();
-        if (shouldBlockOption(option))
+        // Check if this is a POH obelisk by checking the object ID
+        GameObject obelisk = findObelisk();
+        if (obelisk == null || obelisk.getId() != POH_OBELISK_ID)
         {
-            int riskValue = calculateRiskValue();
-            log.debug("Risk check - Value: {}, Threshold: {}", riskValue, config.wealthThreshold());
+            protectionActive = false;
+            obeliskLocation = null;
+            return;
+        }
+
+        // Calculate risk value regardless of menu option
+        int riskValue = calculateRiskValue();
+        log.debug("Risk check - Value: {}, Threshold: {}", riskValue, config.wealthThreshold());
+        
+        if (riskValue > config.wealthThreshold())
+        {
+            protectionActive = true;
+            obeliskLocation = obelisk.getLocalLocation();
             
-            if (riskValue > config.wealthThreshold())
+            // Only remove menu entries for teleport-related options
+            String option = event.getOption();
+            if (shouldBlockOption(option))
             {
-                protectionActive = true;
-                // Store the obelisk location
-                GameObject obelisk = findObelisk();
-                if (obelisk != null)
-                {
-                    obeliskLocation = obelisk.getLocalLocation();
-                }
                 // Remove the current entry
                 MenuEntry[] entries = client.getMenuEntries();
                 if (entries.length > 0)
@@ -111,11 +120,11 @@ public class ObeliskProtectionPlugin extends Plugin
                     log.debug("Removed menu option: '{}'", option);
                 }
             }
-            else
-            {
-                protectionActive = false;
-                obeliskLocation = null;
-            }
+        }
+        else
+        {
+            protectionActive = false;
+            obeliskLocation = null;
         }
     }
 
