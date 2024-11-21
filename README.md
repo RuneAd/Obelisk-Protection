@@ -1,6 +1,3 @@
-Here's the full README content that you can easily copy and paste:
-
-```markdown
 # Obelisk Protection Plugin
 
 A RuneLite plugin that helps protect players from accidentally using their POH Wilderness Obelisk when carrying valuable items, potentially preventing costly mistakes and item loss.
@@ -59,6 +56,3 @@ For issues, suggestions, or contributions, please visit the plugin's repository 
 ---
 
 Tags: `wilderness`, `obelisk`, `protection`, `poh`
-```
-
-You can now copy this entire block and use it as your README.md file. The formatting will be preserved when you paste it into a markdown file.
