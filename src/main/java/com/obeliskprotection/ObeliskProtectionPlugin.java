@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Arrays;
 import lombok.Getter;
+import com.google.common.collect.ImmutableSet;
+import java.util.Set;
 
 @Slf4j
 @PluginDescriptor(
@@ -57,6 +59,8 @@ public class ObeliskProtectionPlugin extends Plugin
         14826, 14827, 14828, 14829, 14830, 14831  // Wilderness obelisks to ignore
     };
 
+    private static final Set<Integer> POH_REGIONS = ImmutableSet.of(7257, 7513, 7514, 7769, 7770, 8025, 8026);
+
     @Override
     protected void startUp()
     {
@@ -76,23 +80,53 @@ public class ObeliskProtectionPlugin extends Plugin
     @Subscribe
     public void onMenuEntryAdded(MenuEntryAdded event)
     {
-        // Debug every menu entry
-        log.debug("Menu Entry - ID: {}, Option: '{}', Target: '{}'", 
-            event.getIdentifier(), event.getOption(), event.getTarget());
+        // Debug all menu entries and current state
+        log.debug("Menu Entry - Option: '{}', Target: '{}', ID: {}, Type: {}, Protection Active: {}, Location: {}", 
+            event.getOption(), 
+            event.getTarget(),
+            event.getIdentifier(),
+            event.getType(),
+            protectionActive, 
+            obeliskLocation);
 
-        // Check if this is an obelisk interaction
-        if (!event.getTarget().contains("Obelisk"))
+        if (!isInPOH())
         {
-            // Clear protection state when mouse leaves obelisk
+            log.debug("Not in POH");
             protectionActive = false;
             obeliskLocation = null;
             return;
         }
 
+        // Get all current menu entries to check context
+        MenuEntry[] currentEntries = client.getMenuEntries();
+        log.debug("All menu entries: {}", Arrays.toString(currentEntries));
+
+        // Check if this is an obelisk interaction - more lenient check
+        String target = event.getTarget().toLowerCase();
+        if (!target.contains("obelisk") && !target.contains("wilderness portal"))
+        {
+            // Only clear protection if we're not processing an obelisk-related entry
+            if (currentEntries.length == 1) {
+                log.debug("Not an obelisk target and no other entries: '{}'", target);
+                protectionActive = false;
+                obeliskLocation = null;
+            }
+            return;
+        }
+
         // Check if this is a POH obelisk by checking the object ID
         GameObject obelisk = findObelisk();
-        if (obelisk == null || obelisk.getId() != POH_OBELISK_ID)
+        if (obelisk == null)
         {
+            log.debug("Could not find obelisk object");
+            protectionActive = false;
+            obeliskLocation = null;
+            return;
+        }
+        
+        if (obelisk.getId() != POH_OBELISK_ID)
+        {
+            log.debug("Found obelisk but wrong ID: {}", obelisk.getId());
             protectionActive = false;
             obeliskLocation = null;
             return;
@@ -104,25 +138,33 @@ public class ObeliskProtectionPlugin extends Plugin
         
         if (riskValue > config.wealthThreshold())
         {
+            log.debug("Setting protection active - Risk value {} exceeds threshold {}", 
+                riskValue, config.wealthThreshold());
             protectionActive = true;
             obeliskLocation = obelisk.getLocalLocation();
+            log.debug("Obelisk location set to: {}", obeliskLocation);
             
             // Only remove menu entries for teleport-related options
-            String option = event.getOption();
+            String option = event.getOption().toLowerCase();
             if (shouldBlockOption(option))
             {
                 // Remove the current entry
-                MenuEntry[] entries = client.getMenuEntries();
-                if (entries.length > 0)
+                MenuEntry[] updatedEntries = client.getMenuEntries();
+                if (updatedEntries.length > 0)
                 {
-                    // Remove the last entry which is the one that was just added
-                    client.setMenuEntries(Arrays.copyOf(entries, entries.length - 1));
+                    client.setMenuEntries(Arrays.copyOf(updatedEntries, updatedEntries.length - 1));
                     log.debug("Removed menu option: '{}'", option);
                 }
+            }
+            else
+            {
+                log.debug("Option '{}' not blocked", option);
             }
         }
         else
         {
+            log.debug("Protection not active - Risk value {} below threshold {}", 
+                riskValue, config.wealthThreshold());
             protectionActive = false;
             obeliskLocation = null;
         }
@@ -135,10 +177,10 @@ public class ObeliskProtectionPlugin extends Plugin
             return false;
         }
 
-        // Match the exact menu options we want to block
-        return option.equals("Teleport to destination") ||
-               option.equals("Activate") ||
-               option.equals("Set destination");
+        option = option.toLowerCase();
+        return option.equals("teleport to destination") ||
+               option.equals("activate") ||
+               option.equals("set destination");
     }
 
     private int calculateRiskValue()
@@ -222,35 +264,60 @@ public class ObeliskProtectionPlugin extends Plugin
         return totalRiskValue;
     }
 
+    private boolean isInPOH()
+    {
+        if (!client.isInInstancedRegion())
+        {
+            log.debug("Not in instanced region");
+            return false;
+        }
+
+        WorldPoint worldPoint = client.getLocalPlayer().getWorldLocation();
+        WorldPoint instancePoint = WorldPoint.fromLocalInstance(client, client.getLocalPlayer().getLocalLocation());
+        
+        int regionId = worldPoint.getRegionID();
+        int instanceRegionId = instancePoint != null ? instancePoint.getRegionID() : -1;
+        
+        log.debug("Region check - World Region: {}, Instance Region: {}, POH Regions: {}", 
+            regionId, instanceRegionId, POH_REGIONS);
+        
+        return instancePoint != null && POH_REGIONS.contains(instanceRegionId);
+    }
+
     private GameObject findObelisk()
     {
+        if (!isInPOH())
+        {
+            return null;
+        }
+
         Scene scene = client.getScene();
         Tile[][][] tiles = scene.getTiles();
+        int plane = client.getPlane();
 
-        for (int z = 0; z < tiles.length; z++)
+        // Search the entire scene
+        for (int x = 0; x < 104; x++)
         {
-            for (int x = 0; x < tiles[z].length; x++)
+            for (int y = 0; y < 104; y++)
             {
-                for (int y = 0; y < tiles[z][x].length; y++)
+                Tile tile = tiles[plane][x][y];
+                if (tile == null)
                 {
-                    Tile tile = tiles[z][x][y];
-                    if (tile == null)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    GameObject[] gameObjects = tile.getGameObjects();
-                    if (gameObjects == null)
-                    {
-                        continue;
-                    }
+                GameObject[] gameObjects = tile.getGameObjects();
+                if (gameObjects == null)
+                {
+                    continue;
+                }
 
-                    for (GameObject obj : gameObjects)
+                for (GameObject obj : gameObjects)
+                {
+                    if (obj != null && obj.getId() == POH_OBELISK_ID)
                     {
-                        if (obj != null && obj.getId() == POH_OBELISK_ID)
-                        {
-                            return obj;
-                        }
+                        log.debug("Found obelisk at scene coordinates: {}, {}", x, y);
+                        return obj;
                     }
                 }
             }
